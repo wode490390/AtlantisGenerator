@@ -1,0 +1,8 @@
+main: cn.wode490390.nukkit.atlantis.AtlantisGeneratorPlugin
+name: "AtlantisGenerator"
+author: "wode490390"
+description: "Atlantis generator plugin for Nukkit"
+website: "http://wode490390.cn/"
+version: "${pom.version}"
+api: ["1.0.0"]
+load: STARTUP
