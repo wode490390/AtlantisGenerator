@@ -1,4 +1,4 @@
-package cn.wode490390.nukkit.atlantis.generator;
+package cn.wode490390.nukkit.atlantisgen.generator;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockStone;
@@ -19,10 +19,12 @@ import cn.nukkit.level.generator.populator.impl.PopulatorRavines;
 import cn.nukkit.level.generator.populator.type.Populator;
 import cn.nukkit.math.MathHelper;
 import cn.nukkit.math.NukkitRandom;
-import cn.wode490390.nukkit.atlantis.AtlantisGeneratorPlugin;
+import cn.wode490390.nukkit.atlantisgen.AtlantisGeneratorPlugin;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class AtlantisGenerator extends Normal {
@@ -38,14 +40,12 @@ public class AtlantisGenerator extends Normal {
     }
 
     protected ChunkManager level;
-    protected ThreadLocalRandom random = ThreadLocalRandom.current();
     protected NukkitRandom nukkitRandom;
     protected long localSeed1;
     protected long localSeed2;
     protected BiomeSelector selector;
     protected final List<Populator> populators = new ArrayList<>();
     protected final List<Populator> generationPopulators = new ArrayList<>();
-    protected final ThreadLocal<Biome[]> biomes = ThreadLocal.withInitial(() -> new Biome[10 * 10]);
     protected final ThreadLocal<float[]> depthRegion = ThreadLocal.withInitial(() -> null);
     protected final ThreadLocal<float[]> mainNoiseRegion = ThreadLocal.withInitial(() -> null);
     protected final ThreadLocal<float[]> minLimitRegion = ThreadLocal.withInitial(() -> null);
@@ -79,22 +79,26 @@ public class AtlantisGenerator extends Normal {
         this.level = level;
         this.nukkitRandom = random;
         this.nukkitRandom.setSeed(this.level.getSeed());
-        this.localSeed1 = this.random.nextLong();
-        this.localSeed2 = this.random.nextLong();
+        Random localRandom = ThreadLocalRandom.current();
+        this.localSeed1 = localRandom.nextLong();
+        this.localSeed2 = localRandom.nextLong();
         this.nukkitRandom.setSeed(this.level.getSeed());
         this.selector = new BiomeSelector(this.nukkitRandom);
+
         this.minLimitPerlinNoise = new NoiseGeneratorOctavesF(random, 16);
         this.maxLimitPerlinNoise = new NoiseGeneratorOctavesF(random, 16);
         this.mainPerlinNoise = new NoiseGeneratorOctavesF(random, 8);
         this.surfaceNoise = new NoiseGeneratorPerlinF(random, 4);
         this.scaleNoise = new NoiseGeneratorOctavesF(random, 10);
         this.depthNoise = new NoiseGeneratorOctavesF(random, 16);
+
         PopulatorGroundCover cover = new PopulatorGroundCover();
         this.generationPopulators.add(cover);
+
         PopulatorBedrock bedrock = new PopulatorBedrock();
         this.generationPopulators.add(bedrock);
-        PopulatorOre ores = new PopulatorOre();
-        ores.setOreTypes(new OreType[]{
+
+        PopulatorOre ores = new PopulatorOre(STONE, new OreType[]{
                 new OreType(Block.get(COAL_ORE), 20, 17, 0, 250),
                 new OreType(Block.get(IRON_ORE), 20, 9, 0, 250),
                 new OreType(Block.get(REDSTONE_ORE), 8, 8, 0, 250),
@@ -108,8 +112,10 @@ public class AtlantisGenerator extends Normal {
                 new OreType(Block.get(STONE, BlockStone.ANDESITE), 10, 33, 0, 250)
         });
         this.populators.add(ores);
+
         PopulatorCaves caves = new PopulatorCaves();
         this.populators.add(caves);
+
         PopulatorRavines ravines = new PopulatorRavines();
         this.populators.add(ravines);
     }
@@ -119,7 +125,9 @@ public class AtlantisGenerator extends Normal {
         int baseX = chunkX << 4;
         int baseZ = chunkZ << 4;
         this.nukkitRandom.setSeed(chunkX * this.localSeed1 ^ chunkZ * this.localSeed2 ^ this.level.getSeed());
+
         BaseFullChunk chunk = this.level.getChunk(chunkX, chunkZ);
+
         float[] depthRegion = this.depthNoise.generateNoiseOctaves(this.depthRegion.get(), chunkX * 4, chunkZ * 4, 5, 5, 200f, 200f, 0.5f);
         this.depthRegion.set(depthRegion);
         float[] mainNoiseRegion = this.mainPerlinNoise.generateNoiseOctaves(this.mainNoiseRegion.get(), chunkX * 4, 0, chunkZ * 4, 5, 33, 5, 684.412f / 60f, 684.412f / 160f, 684.412f / 60f);
@@ -129,6 +137,7 @@ public class AtlantisGenerator extends Normal {
         float[] maxLimitRegion = this.maxLimitPerlinNoise.generateNoiseOctaves(this.maxLimitRegion.get(), chunkX * 4, 0, chunkZ * 4, 5, 33, 5, 684.412f, 684.412f, 684.412f);
         this.maxLimitRegion.set(maxLimitRegion);
         float[] heightMap = this.heightMap.get();
+
         int horizCounter = 0;
         int vertCounter = 0;
         for (int xSeg = 0; xSeg < 5; ++xSeg) {
@@ -137,6 +146,7 @@ public class AtlantisGenerator extends Normal {
                 float baseHeightSum = 0;
                 float biomeWeightSum = 0;
                 Biome biome = pickBiome(baseX + (xSeg * 4), baseZ + (zSeg * 4));
+
                 for (int xSmooth = -2; xSmooth <= 2; ++xSmooth) {
                     for (int zSmooth = -2; zSmooth <= 2; ++zSmooth) {
                         Biome biome1 = pickBiome(baseX + (xSeg * 4) + xSmooth, baseZ + (zSeg * 4) + zSmooth);
@@ -151,60 +161,76 @@ public class AtlantisGenerator extends Normal {
                         biomeWeightSum += scaledWeight;
                     }
                 }
+
                 heightVariationSum /= biomeWeightSum;
                 baseHeightSum /= biomeWeightSum;
                 heightVariationSum = heightVariationSum * 0.9f + 0.1f;
                 baseHeightSum = (baseHeightSum * 4f - 1f) / 8f;
                 float depthNoise = depthRegion[vertCounter] / 8000f;
+
                 if (depthNoise < 0) {
                     depthNoise = -depthNoise * 0.3f;
                 }
+
                 depthNoise = depthNoise * 3f - 2f;
+
                 if (depthNoise < 0) {
                     depthNoise /= 2f;
+
                     if (depthNoise < -1f) {
                         depthNoise = -1f;
                     }
+
                     depthNoise /= 1.4f;
                     depthNoise /= 2f;
                 } else {
                     if (depthNoise > 1f) {
                         depthNoise = 1f;
                     }
+
                     depthNoise /= 8f;
                 }
+
                 ++vertCounter;
                 float baseHeightClone = baseHeightSum;
                 float heightVariationClone = heightVariationSum;
                 baseHeightClone += depthNoise * 0.2f;
                 baseHeightClone = baseHeightClone * 8.5f / 8f;
                 float baseHeightFactor = 8.5f + baseHeightClone * 4f;
+
                 for (int ySeg = 0; ySeg < 33; ++ySeg) {
                     float baseScale = (ySeg - baseHeightFactor) * 12f * 128f / 256f / heightVariationClone;
+
                     if (baseScale < 0) {
                         baseScale *= 4f;
                     }
+
                     float minScaled = minLimitRegion[horizCounter] / 512f;
                     float maxScaled = maxLimitRegion[horizCounter] / 512f;
                     float noiseScaled = (mainNoiseRegion[horizCounter] / 10f + 1f) / 2f;
                     float clamp = MathHelper.denormalizeClamp(minScaled, maxScaled, noiseScaled) - baseScale;
+
                     if (ySeg > 29) {
                         float yScaled = (ySeg - 29) / 3f;
                         clamp = clamp * (1f - yScaled) + -10f * yScaled;
                     }
+
                     heightMap[horizCounter] = clamp;
                     ++horizCounter;
                 }
             }
         }
+
         for (int xSeg = 0; xSeg < 4; ++xSeg) {
             int xScale = xSeg * 5;
             int xScaleEnd = (xSeg + 1) * 5;
+
             for (int zSeg = 0; zSeg < 4; ++zSeg) {
                 int zScale1 = (xScale + zSeg) * 33;
                 int zScaleEnd1 = (xScale + zSeg + 1) * 33;
                 int zScale2 = (xScaleEnd + zSeg) * 33;
                 int zScaleEnd2 = (xScaleEnd + zSeg + 1) * 33;
+
                 for (int ySeg = 0; ySeg < 32; ++ySeg) {
                     double height1 = heightMap[zScale1 + ySeg];
                     double height2 = heightMap[zScaleEnd1 + ySeg];
@@ -214,14 +240,17 @@ public class AtlantisGenerator extends Normal {
                     double height6 = (heightMap[zScaleEnd1 + ySeg + 1] - height2) * 0.125f;
                     double height7 = (heightMap[zScale2 + ySeg + 1] - height3) * 0.125f;
                     double height8 = (heightMap[zScaleEnd2 + ySeg + 1] - height4) * 0.125f;
+
                     for (int yIn = 0; yIn < 8; ++yIn) {
                         double baseIncr = height1;
                         double baseIncr2 = height2;
                         double scaleY = (height3 - height1) * 0.25f;
                         double scaleY2 = (height4 - height2) * 0.25f;
+
                         for (int zIn = 0; zIn < 4; ++zIn) {
                             double scaleZ = (baseIncr2 - baseIncr) * 0.25f;
                             double scaleZ2 = baseIncr - scaleZ;
+
                             for (int xIn = 0; xIn < 4; ++xIn) {
                                 if ((scaleZ2 += scaleZ) > 0) {
                                     chunk.setBlockId(xSeg * 4 + zIn, ySeg * 8 + yIn, zSeg * 4 + xIn, STONE);
@@ -229,9 +258,11 @@ public class AtlantisGenerator extends Normal {
                                     chunk.setBlockId(xSeg * 4 + zIn, ySeg * 8 + yIn, zSeg * 4 + xIn, STILL_WATER);
                                 }
                             }
+
                             baseIncr += scaleY;
                             baseIncr2 += scaleY2;
                         }
+
                         height1 += height5;
                         height2 += height6;
                         height3 += height7;
@@ -240,6 +271,7 @@ public class AtlantisGenerator extends Normal {
                 }
             }
         }
+
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 if (AtlantisGeneratorPlugin.getInstance().biome) {
@@ -249,19 +281,17 @@ public class AtlantisGenerator extends Normal {
                 }
             }
         }
-        this.generationPopulators.forEach((populator) -> {
-            populator.populate(this.level, chunkX, chunkZ, this.nukkitRandom, chunk);
-        });
+
+        this.generationPopulators.forEach(populator -> populator.populate(this.level, chunkX, chunkZ, this.nukkitRandom, chunk));
     }
 
     @Override
     public void populateChunk(int chunkX, int chunkZ) {
         BaseFullChunk chunk = this.level.getChunk(chunkX, chunkZ);
         this.nukkitRandom.setSeed(0xdeadbeef ^ (chunkX << 8) ^ chunkZ ^ this.level.getSeed());
-        this.populators.forEach((populator) -> {
-            populator.populate(this.level, chunkX, chunkZ, this.nukkitRandom, chunk);
-        });
-        EnumBiome.getBiome(chunk.getBiomeId(7, 7)).populateChunk(this.level, chunkX, chunkZ, this.nukkitRandom);
+        this.populators.forEach(populator -> populator.populate(this.level, chunkX, chunkZ, this.nukkitRandom, chunk));
+        Biome.getBiome(chunk.getBiomeId(7, 7)).populateChunk(this.level, chunkX, chunkZ, this.nukkitRandom);
+
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 for (int y = 0; y <= AtlantisGeneratorPlugin.getInstance().seaLevel; y++) {

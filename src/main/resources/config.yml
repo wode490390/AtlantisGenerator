@@ -1,4 +1,6 @@
-# 0-255
-sea-level: 254
-# Enable biome?
+# Allowed values: Integers in the range [0, 255]
+sea-level: 128
+# enable biome
 biome: true
+# register limited old world generator
+old: true

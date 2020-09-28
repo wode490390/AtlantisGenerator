@@ -1,7 +1,8 @@
-package cn.wode490390.nukkit.atlantis.generator;
+package cn.wode490390.nukkit.atlantisgen.generator;
 
 import cn.nukkit.level.biome.EnumBiome;
 import cn.nukkit.level.format.generic.BaseFullChunk;
+
 import java.util.Map;
 
 public class AtlantisOldGenerator extends AtlantisGenerator {
